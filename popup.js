@@ -17,9 +17,17 @@ $(document).ready(() => {
         <button id="dimigolife">디미고라이프</button>
         <button id="music-req">곡 신청하기</button>
         <button id="music-chart">기상송 차트</button>
+        <button id="music-reset">티켓 돌려받기</button>
       `);
     })
-    .catch((err) => console.log(err));
+    .catch((err) => {
+      console.log(err);
+      if (typeof err != "string") {
+        err = "디미고라이프가 죽었거나<br>디미파이에 연결되어 있지<br>않습니다.";
+      }
+      $("#auth").html(err);
+    });
+  // init
 
   $(document).on("click", "#auth, #dimigolife", (e) => {
     chrome.tabs.create({ url: "https://dimigo.life/" });
@@ -138,4 +146,30 @@ $(document).ready(() => {
         .catch((err) => alert(err));
     });
   }); // #chart .music
+
+  $(document).on("click", "#music-reset", (e) => {
+    fetch("https://api.dimigo.life/music/me")
+      .then((res) => res.json())
+      .then((res) => {
+        musics = res.data.length;
+        chrome.storage.local.get(["studentdata"], (s) => {
+          me = s.studentdata;
+          res.data.forEach((m) => {
+            fetch("https://api.dimigo.life/music/" + m.id, {
+              method: "DELETE",
+              headers: { Origin: "https://dimigo.life" },
+            })
+              .then((res) => res.json())
+              .then((res) => {
+                if (!res.success) throw errorMessages[res.code];
+                $(".liked").removeClass("liked");
+              });
+          });
+          me.likeTicket = musics;
+          $("#likeTicket").text(me.likeTicket);
+          musicme = [];
+          chrome.storage.local.set({ studentdata: me, musicme: musicme });
+        });
+      });
+  });
 });
