@@ -1,175 +1,175 @@
-$(document).ready(() => {
-  errorMessages = { 100: "신청할 수 없습니다.", 101: "신청이 불가능한 학년입니다.", 102: "신청 기간 시작 전입니다.", 103: "신청 기간이 끝났습니다.", 1041: "좌석 선택을 하지 않으려면 사유를 입력해야 합니다.", 1042: "사유를 입력해야 합니다.", 105: "이미 다른 사람이 신청한 좌석 입니다.", 106: "선착순 마감되었습니다.", 107: "이미 신청한 기상송 입니다.", 108: "더 이상 신청할 수 없습니다.", 109: "이미 다른 사람이 신청한 시간 입니다.", 403: "권한이 없습니다.", 404: "해당하는 데이터가 없습니다.", 400: "비정상적인 접근입니다.", 500: "예기치 못한 오류가 발생하였습니다.", 401: "재인증이 필요합니다." };
+$(document).ready(async () => {
+  errorMessages = {
+    100: "신청할 수 없습니다.",
+    101: "신청이 불가능한 학년입니다.",
+    102: "신청 기간 시작 전입니다.",
+    103: "신청 기간이 끝났습니다.",
+    1041: "좌석 선택을 하지 않으려면 사유를 입력해야 합니다.",
+    1042: "사유를 입력해야 합니다.",
+    105: "이미 다른 사람이 신청한 좌석입니다.",
+    106: "선착순 마감되었습니다.",
+    107: "이미 신청한 기상송입니다.",
+    108: "더 이상 신청할 수 없습니다.",
+    109: "이미 다른 사람이 신청한 시간입니다.",
+    400: "비정상적인 접근입니다.",
+    401: "재인증이 필요합니다.",
+    403: "권한이 없습니다.",
+    404: "해당하는 데이터가 없습니다.",
+    500: "예기치 못한 오류가 발생하였습니다.",
+  };
 
-  fetch("https://api.dimigo.life/users/me")
-    .then((res) => res.json())
-    .then((res) => {
-      if (!res.success) {
-        $("#auth").text("인증하기(로그인)").prop("disabled", false);
-        throw errorMessages[res.code];
-      } else return res.data;
-    })
-    .then((me) => {
-      chrome.storage.local.set({ studentdata: me });
+  const openDimigoLife = () => {
+    chrome.tabs.create({ url: "https://life.dimigo.in/" });
+  };
 
-      $("body").html(`
-        <div id="me">${me.grade}${me.class}${me.number.toString().padStart(2, "0")} ${me.name}(${{ M: "남", F: "여" }[me.gender]}) [티켓 <b id="likeTicket">${me.likeTicket}</b>]</div>
-        <button id="dimigolife">디미고라이프</button>
-        <button id="music-req">곡 신청하기</button>
-        <button id="music-chart">기상송 차트</button>
-        <button id="music-reset">티켓 돌려받기</button>
-      `);
-    })
-    .catch((err) => {
-      console.log(err);
-      if (typeof err != "string") {
-        err = "디미고라이프가 죽었거나<br>디미파이에 연결되어 있지<br>않습니다.";
-      }
-      $("#auth").html(err);
-    });
-  // init
+  const promptError = (err) => {
+    if (typeof err != "string") {
+      $("body").html("<button id='auth'>인증하기(로그인)</button>");
+    } else {
+      alert(err);
+    }
 
-  $(document).on("click", "#auth, #dimigolife", (e) => {
-    chrome.tabs.create({ url: "https://dimigo.life/" });
-  }); // #auth, #dimigolife
-
-  $(document).on("click", "#music-req", (e) => {
-    q = prompt("검색어를 입력하세요.");
-    if (!q) return;
-    req = $("body").has("#req").length ? $("#req").html("로딩 중") : $(`<div id="req">로딩 중</div>`).insertAfter("#music-req");
-    fetch("https://api.dimigo.life/music/search?q=" + q)
+    return false;
+  };
+  const fetchURL = async (url, method = "GET") => {
+    const response = await fetch(url, { method: method })
       .then((res) => res.json())
       .then((res) => {
         if ("code" in res) throw errorMessages[res.code];
-        req.text("");
-        res.forEach((d) => {
-          req.append(`<div class="music" data-id="${d.id}">${d.title} - <small>${d.artist}</small></div>`);
-        });
+        return res;
       })
-      .catch((err) => alert(err));
-  }); // #music-req
+      .catch(promptError);
+    return response;
+  };
+  const getMe = async () => await fetchURL("https://life.dimigo.in/api/users/me").then((res) => res.data);
 
-  $(document).on("click", "#req .music", (e) => {
-    id = $(e.currentTarget).attr("data-id");
-    really = confirm("이 곡을 신청하시겠습니까?");
-    if (!really) return;
-    chrome.storage.local.get(["studentdata"], (s) => {
-      me = s.studentdata;
-      if (me.likeTicket == 0) {
-        alert("신청 티켓이 없습니다!");
-        return;
-      }
-      fetch("https://api.dimigo.life/music/" + id, {
-        method: "POST",
-        headers: { Origin: "https://dimigo.life" },
-      })
-        .then((res) => res.json())
-        .then((res) => {
-          if (!res.success) throw errorMessages[res.code];
-          alert(`성공적으로 신청했습니다.`);
-          me.likeTicket -= 1;
-          $("#likeTicket").text(me.likeTicket);
-          chrome.storage.local.set({ studentdata: me });
-        })
-        .catch((err) => alert(err));
+  const formattedName = (me) => `${me.grade}${me.class}${me.number.toString().padStart(2, "0")} ${me.name}(${{ M: "남", F: "여" }[me.gender]})`;
+  const loadMe = async (me) => {
+    if (!me) me = await getMe();
+    $("#me").html(`${formattedName(me)} [티켓 <b id="likeTicket">${me.likeTicket}</b>]`);
+  };
+  const listOf = async (list) => {
+    const container = $("<div></div>");
+    list.forEach((music) => {
+      container.append(`<div class="music" data-id="${music.id}">${music.title} - <small>${music.artist}</small></div>`);
     });
-  }); // #req .music
 
-  $(document).on("click", "#music-chart", (e) => {
-    $("#music-chart").prop("disabled", true);
-    chart = $(`<div id="chart">로딩 중</div>`).insertAfter("#music-chart");
-
-    chrome.storage.local.get(["studentdata"], (s) => {
-      fetch("https://api.dimigo.life/music/chart?limit=100&gender=" + s.studentdata.gender)
-        .then((res) => res.json())
-        .then((res) => res.data.list)
-        .then((musicchart) => {
-          musicchart.forEach((music) => {
-            music.liked = false;
-          });
-
-          fetch("https://api.dimigo.life/music/me")
-            .then((res) => res.json())
-            .then((res) => {
-              musicme = [];
-              res.data.forEach((mine) => {
-                musicchart.forEach((music) => {
-                  if (music.id == mine.id) {
-                    musicme.push(music.id.toString());
-                    music.liked = true;
-                  }
-                });
-              });
-
-              chart.text("");
-              musicchart.forEach((music) => {
-                chart.append(`<div class="music ${music.liked ? "liked" : ""}" data-id="${music.id}">${music.title} - <small>${music.artist}</small></div>`);
-              });
-
-              chrome.storage.local.set({ musicchart: musicchart });
-              chrome.storage.local.set({ musicme: musicme });
-            });
-        });
+    const musicMe = await fetchURL("https://life.dimigo.in/api/music/me");
+    musicMe.data.forEach((music) => {
+      container.find(`.music[data-id="${music.id}"]`).addClass("liked");
     });
-  }); // #music-chart
 
-  $(document).on("click", "#chart .music", (e) => {
-    id = $(e.currentTarget).attr("data-id");
-    chrome.storage.local.get(["studentdata", "musicme"], (s) => {
-      me = s.studentdata;
-      musicme = s.musicme;
-      already = musicme.includes(id);
-      if (!already && me.likeTicket == 0) {
-        alert("신청 티켓이 없습니다!");
-        return;
-      }
-      fetch("https://api.dimigo.life/music/" + id, {
-        method: already ? "DELETE" : "POST",
-        headers: { Origin: "https://dimigo.life" },
-      })
-        .then((res) => res.json())
-        .then((res) => {
-          if (!res.success) throw errorMessages[res.code];
-          me.likeTicket += already ? 1 : -1;
-          $("#likeTicket").text(me.likeTicket);
-          if (already) {
-            $(e.currentTarget).removeClass("liked");
-            idx = musicme.indexOf(id);
-            if (idx == -1) throw "예기치 못한 오류가 발생하였습니다.";
-            musicme.splice(idx, 1);
-          } else {
-            $(e.currentTarget).addClass("liked");
-            musicme.push(id);
-          }
-          chrome.storage.local.set({ studentdata: me, musicme: musicme });
-        })
-        .catch((err) => alert(err));
+    return container.html();
+  };
+
+  const loadChart = async (me) => {
+    if (!$("body").find("#chart").length) return;
+
+    if (!me) me = await getMe();
+
+    const musicChart = await fetchURL(`https://life.dimigo.in/api/music/chart?limit=100&gender=${me.gender}`);
+
+    $("#chart").html(await listOf(musicChart.data.list));
+  };
+
+  const loadSearch = async (q) => {
+    if (!$("body").find("#searchResult").length) return;
+
+    if (!q) q = $("#searchResult").attr("data-q");
+    else $("#searchResult").attr("data-q", q);
+
+    const searchResult = await fetchURL(`https://life.dimigo.in/api/music/search?q=${q}`);
+
+    $("#searchResult").html(await listOf(searchResult));
+  };
+
+  const loadMeAndChart = async () => {
+    const me = await getMe();
+    loadMe(me);
+    loadChart(me);
+  };
+  const loadEverything = () => {
+    loadMeAndChart();
+    loadSearch();
+  };
+
+  const initialize = async () => {
+    let me = await getMe();
+    if (!me) openDimigoLife();
+
+    $("body").html(`
+    <div id="me">로딩 중</div>
+    <button id="dimigolife">디미고라이프</button>
+    <button id="search">곡 검색하기</button>
+    <button id="chart-toggle">기상송 차트</button>
+    <button id="music-reset">티켓 돌려받기</button>
+    `);
+    loadMe();
+  };
+  initialize();
+
+  $(document).on("click", "#auth, #dimigolife", openDimigoLife);
+
+  $(document).on("click", "#search", async (e) => {
+    let q = prompt("검색어를 입력하세요.");
+    if (!q) return;
+    if ($("body").find("#searchResult").length) $("#searchResult").html("로딩 중");
+    else $(`<div id="searchResult">로딩 중</div>`).insertAfter("#search");
+    loadSearch(q);
+  });
+
+  const requestMusic = async (musicID, react = true) => {
+    let response = await fetchURL(`https://life.dimigo.in/api/music/${musicID}`, "POST");
+
+    if (response && react) {
+      alert(`성공적으로 신청했습니다.`);
+      loadEverything();
+    }
+  };
+  const deleteMusic = async (musicID, react = true) => {
+    let response = await fetchURL(`https://life.dimigo.in/api/music/${musicID}`, "DELETE");
+
+    if (response && react) {
+      alert(`성공적으로 취소했습니다.`);
+      loadEverything();
+    }
+  };
+
+  const musicClick = async (e) => {
+    let musicID = $(e.currentTarget).attr("data-id");
+
+    let musicMe = await fetchURL("https://life.dimigo.in/api/music/me");
+
+    let already = musicMe.data.find((music) => music.id == musicID);
+
+    if (already) {
+      if (!confirm("이 곡을 취소하시겠습니까?")) return;
+      deleteMusic(musicID);
+    } else {
+      if (!confirm("이 곡을 신청하시겠습니까?")) return;
+      requestMusic(musicID);
+    }
+  };
+
+  $(document).on("click", ".music", async (e) => {
+    await musicClick(e);
+  });
+
+  $(document).on("click", "#chart-toggle", (e) => {
+    if ($("body").find("#chart").length) return $("#chart").remove();
+
+    $(`<div id="chart">로딩 중</div>`).insertAfter("#chart-toggle");
+
+    loadChart();
+  });
+
+  $(document).on("click", "#music-reset", async (e) => {
+    if (!confirm("정말로 모든 티켓을 돌려받으시겠습니까?")) return;
+    let musicMe = await fetchURL("https://life.dimigo.in/api/music/me");
+    musicMe.data.forEach((music) => {
+      deleteMusic(music.id, false);
     });
-  }); // #chart .music
-
-  $(document).on("click", "#music-reset", (e) => {
-    fetch("https://api.dimigo.life/music/me")
-      .then((res) => res.json())
-      .then((res) => {
-        musics = res.data.length;
-        chrome.storage.local.get(["studentdata"], (s) => {
-          me = s.studentdata;
-          res.data.forEach((m) => {
-            fetch("https://api.dimigo.life/music/" + m.id, {
-              method: "DELETE",
-              headers: { Origin: "https://dimigo.life" },
-            })
-              .then((res) => res.json())
-              .then((res) => {
-                if (!res.success) throw errorMessages[res.code];
-                $(".liked").removeClass("liked");
-              });
-          });
-          me.likeTicket = musics;
-          $("#likeTicket").text(me.likeTicket);
-          musicme = [];
-          chrome.storage.local.set({ studentdata: me, musicme: musicme });
-        });
-      });
+    alert("성공적으로 돌려받았습니다.");
+    loadEverything();
   });
 });

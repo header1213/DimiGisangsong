@@ -1,6 +1,6 @@
 {
   "name": "DimiGisangsong",
-  "description": "Build an Extension!",
+  "description": "An extension for DIMIGOINs interested in wake-up songs",
   "version": "1.0.0",
   "manifest_version": 3,
   "action": {
@@ -19,5 +19,5 @@
     "128": "./images/dimi128.png"
   },
   "permissions": ["tabs", "storage"],
-  "host_permissions": ["*://*.dimigo.life/*"]
+  "host_permissions": ["*://life.dimigo.in/*"]
 }
