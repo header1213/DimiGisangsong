@@ -31,7 +31,7 @@ $(document).ready(async () => {
         return res;
       })
       .catch((err) => {
-        if (typeof err !== "string") $("body").html("<button id='auth'>예상치 못한 버그가<br />발생했습니다.</button>");
+        if (typeof err !== "string") $("body").html(`<button id='auth'>예상치 못한 버그가<br />발생했습니다. ${err.message}</button>`);
         else alert(err);
 
         return false;
@@ -81,19 +81,7 @@ $(document).ready(async () => {
   };
 
   // Initialization
-  (async () => {
-    let me = await getMe();
-    if (!me) openDimigoLife();
-
-    $("body").html(`
-    <div id="me">로딩 중</div>
-    <button id="dimigolife">디미고라이프</button>
-    <button id="search">곡 검색하기</button>
-    <button id="chart-toggle">기상송 차트</button>
-    <button id="music-reset">티켓 돌려받기</button>
-    `);
-    reloadData();
-  })();
+  reloadData();
 
   $(document).on("click", "#auth, #dimigolife", openDimigoLife);
 
