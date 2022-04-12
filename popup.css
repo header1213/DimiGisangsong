@@ -22,7 +22,7 @@ body {
 button {
   font-family: "pretendard";
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: black;
 
   background: white;
@@ -38,6 +38,8 @@ button:disabled {
 }
 #auth {
   font-size: 20px;
+  width: 60%;
+  min-height: 2em;
   margin: 40px 0;
 }
 
